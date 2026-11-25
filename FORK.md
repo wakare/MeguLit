@@ -11,6 +11,9 @@ upstream base: a8dba67
   shrink, the whole line moves up (never above the game window's top) instead of leaving the translation off screen or
   squeezing it into a tiny scroll box. `web/reader/modules/text-place.js` (anchored layout, e.g. ATRI) and
   `web/reader/modules/game-fit.js` (plain hook reader). Test: `validation/text-place-long-translation.test.cjs`.
+- **Lookup card remembers where it was dragged.** The next card opens at that place (pulled back on screen if needed),
+  also after a restart (stored in the reader's localStorage, `megulit.fork.lookupPlace`). `web/reader/modules/selection.js`.
+  Test: `validation/lookup-card-remember.test.cjs`.
 - **Card timing log.** Every card made writes one JSON line to `logs/card-timing.log`: each step and how long it took
   (`lookupWord`, `translationAndFurigana`, `gameMediaRecording`, `pickSentenceVoice`, `ensureSpeech`, `ttsWord`,
   `ttsSentence`, `prepareNoteModel`, `sendToAnki`, `saveToWordBook`), the total, and a later `cardLater` line when vocal
