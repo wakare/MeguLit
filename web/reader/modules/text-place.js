@@ -236,6 +236,11 @@
     if (row) { const limit = workLimit();
       const fs0 = parseFloat(getComputedStyle(parts[0] || row).fontSize) || 16; let rb = row.getBoundingClientRect();
       if (rb.bottom > limit) { /* 2026-11-20 (user: 「译文为啥都这么小啊 别这么小」): at most 15 % smaller; remaining overflow belongs to the translation alone */ const fs = Math.max(Math.ceil(cnBase * .85), Math.floor(fs0 * Math.max(.85, (limit - rb.top) / Math.max(1, rb.height)))); for (const o of parts.length ? parts : [row]) set(o, 'font-size', fs + 'px'); rb = row.getBoundingClientRect(); }
+      /* fork (wakare): a translation that still runs past the bottom lifts the whole line (Japanese with it) until it is in
+         sight, never above the client top; only what still does not fit then scrolls. Upstream keeps the Japanese on the
+         game's place and lets a long sentence's translation leave the screen. */
+      if (rb.bottom > limit) { const wt = win.getBoundingClientRect().top, up = Math.min(Math.ceil(rb.bottom - limit), Math.max(0, Math.floor(wt - Math.max(0, cy0) - 4)));
+        if (up > 0) { set(win, 'top', (parseFloat(win.style.top) || wt) - up + 'px'); rb = row.getBoundingClientRect(); } }
       // The calibrated Japanese baseline wins even when the translation cannot fit.
       const available = Math.floor(limit - rb.top), oneLine = parseFloat(getComputedStyle(parts[0] || row).lineHeight) || cnBase * 1.4;
       if (rb.bottom > limit && available >= oneLine) {

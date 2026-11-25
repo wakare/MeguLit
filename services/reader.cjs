@@ -625,7 +625,8 @@ class Reader{
   if(action==='ankiScreenshot'){
    if(config.ankiGameMedia===false)return {};
    /* 2026-11-14: the card picture is the game window's own surface only, never MeguLit's text box or lookup card */
-   const image=await this.gal?.gameFrame();
+   const shotAt=Date.now(),image=await this.gal?.gameFrame();
+   require('./card-timing.cjs').once(this.root,'screenshot',Date.now()-shotAt,{ok:!!image}); /* fork: timing */
    if(!image)return {};
    const id=require('node:crypto').randomUUID();
    /* #115: a picture taken when the lookup card opens is used when + Anki is clicked later, so keep a few for 3 min */
@@ -659,6 +660,7 @@ class Reader{
    for(let i=0;i<40;i++){await new Promise(resolve=>setTimeout(resolve,750));try{return {launched:true,...await anki.status(config)};}catch{}}throw Error('ANKI_OFFLINE');
   }
   if(['word','speak','prefetch','anki'].includes(action)){
+   const tm=action==='anki'?require('./card-timing.cjs').start(this.root,{dictionary:!!args.dictionary}):null; /* fork: per-step card timing */
    const captured=action==='anki'&&typeof args.screenshotId==='string'&&this.cardScreenshots?.get(args.screenshotId);
    const screenshot=captured&&captured.expires>Date.now()?captured.image:'';
    if(captured)this.cardScreenshots.delete(args.screenshotId);
@@ -669,11 +671,12 @@ class Reader{
       sentence is the example the page passes (a MOJi example, or none), never the word itself; no game picture or game voice is taken,
       and no example line or saved sentence is written to the word book */
    if(args.dictionary){word.sentence=String(args.sentence||'').slice(0,1000);word.ambiguous=false;}
-   if(action==='word')return word;let audio;
+   if(action==='word')return word;let audio;if(tm){tm.info.word=word.surface;tm.step('lookupWord');}
    if(['speak','prefetch'].includes(action)){await this.runtime.services().ensureSpeech(config.aivisUrl,config.aivisGpu);/* word.spoken: the whole number word the selection is part of (分 of 10分 says じゅっぷん, as the furigana shows) */const audio=await this.runtime.speech().synthesize(word.spoken?{...word,...word.spoken}:word,config,{prefetch:action==='prefetch'});return action==='prefetch'?{ready:true}:audio;}
    const picked=args.dictionary?{translation:String(args.translation||'').slice(0,1000),translationSource:args.translation?'dictionary':''}:this.sentenceTranslation(args.text,String(args.translation||'').slice(0,1000));args.translation=picked.translation;args.translationSource=picked.translationSource;const extra={aiNote:args.aiNote&&typeof args.aiNote.text==='string'?{kind:args.aiNote.kind==='summary'?'summary':'explain',text:args.aiNote.text.slice(0,2000)}:null,translation:picked.translation.slice(0,1000),translationSource:picked.translationSource,gameTitle:args.dictionary?'':this.gameTitle()};if(!args.dictionary)try{const insights=require('./learning-insights.cjs'),learning=this.runtime.learning(),resolved=learning.readings.resolve(await learning.tokenize(args.text));let pairs=[];try{pairs=this.gal?.hooks?.resolveSource?.(args.text)?.ruby||[];}catch{}/* one rule for every example line (core/example-ruby.cjs): game ruby → dictionary reading, names and guesses bare */extra.sentenceHtml=require('../core/example-ruby.cjs').exampleCardHtml(args.text,resolved,{pairs,gameRuby:this.gal?.gameRuby?.dict(this.gal?.styleSync?.profileKey)||{},start:args.start,end:args.end});void insights;}catch{}
+   tm?.step('translationAndFurigana');
    if(config.ankiGameMedia!==false&&!args.dictionary){
-    const media=await this.gal?.gameMedia(args.text,Date.now(),false).catch(()=>null);
+    const media=await this.gal?.gameMedia(args.text,Date.now(),false).catch(()=>null);tm?.step('gameMediaRecording');
     extra.screenshot=screenshot;
     /* E454 (player: the card's voice carried long stretches of BGM): the voice file the script names for this line comes
        first, it is the clean voice alone; the clip recorded from the game's sound (trimmed to the spoken run) is next,
@@ -686,22 +689,26 @@ class Reader{
     else if(media?.audio&&(()=>{try{return require('./game-voice.cjs').recordedFits(this.root,args.text,media.audio.data);}catch{return false;}})()){extra.sentenceAudio=media.audio;extra.gameAudio=true;extra.recorded=true;}
     else if(voice){extra.sentenceAudio=asAudio(voice);extra.gameAudio=true;}
     try{logSink.append(path.join(this.root,'logs','reader-host.log'),JSON.stringify({at:new Date().toISOString(),type:'ankiGameAudio',matched:!!media?.matched,recording:!!media?.recording,voiced:!!media?.audio,error:media?.error||''})+'\n');}catch{}
+    if(tm){tm.step('pickSentenceVoice');tm.info.sentenceAudio=extra.recorded?'recorded':extra.gameAudio?'gameFile':'none';}
    }
    if(config.ankiAudio){
     const speechReady=await this.runtime.services().ensureSpeech(config.aivisUrl,config.aivisGpu).then(()=>true,()=>false);
+    if(tm){tm.step('ensureSpeech');tm.info.speechReady=speechReady;}
     if(speechReady){
      try{audio=await this.runtime.speech().synthesize(word,config);}catch{}
-     if(!extra.sentenceAudio&&(!args.dictionary||word.sentence))try{extra.sentenceAudio=await this.runtime.speech().synthesize({surface:args.dictionary?word.sentence:args.text,reading:'',pitch:[]},config);}catch{}
+     tm?.step('ttsWord');
+     if(!extra.sentenceAudio&&(!args.dictionary||word.sentence)){try{extra.sentenceAudio=await this.runtime.speech().synthesize({surface:args.dictionary?word.sentence:args.text,reading:'',pitch:[]},config);}catch{}tm?.step('ttsSentence');}
     }
    }
-   await this.prepareMiningModel(config);const result=await new(require('../core/anki.cjs').Anki)(fetch,{mediaDir:require('../core/anki-media-cache.cjs').dirFor(this.root)}).sync(word,config,audio,extra);const entries=(await this.invoke('lookup_exact',args)).entries||[];const mined=await this.mine({entry:entries.find(e=>e.id===args.entryId)||entries[0],args:args.dictionary?{...args,text:''}:args,noteId:result.id});if(mined)result.wordMined=true;if(mined?.sentenceSaved)result.sentenceSaved=true;
+   await this.prepareMiningModel(config);tm?.step('prepareNoteModel');const result=await new(require('../core/anki.cjs').Anki)(fetch,{mediaDir:require('../core/anki-media-cache.cjs').dirFor(this.root)}).sync(word,config,audio,extra).catch(error=>{tm?.done({error:String(error?.message||error)});throw error;});tm?.step('sendToAnki');const entries=(await this.invoke('lookup_exact',args)).entries||[];const mined=await this.mine({entry:entries.find(e=>e.id===args.entryId)||entries[0],args:args.dictionary?{...args,text:''}:args,noteId:result.id});if(mined)result.wordMined=true;if(mined?.sentenceSaved)result.sentenceSaved=true;tm?.step('saveToWordBook');
    if(config.ankiGameMedia!==false&&!args.dictionary&&!result.screenshotAttached)result.mediaWarning='SCREENSHOT_UNAVAILABLE';
    result.sentenceAudioSource=extra.gameAudio?'game':extra.sentenceAudio?'synthesized':'';
    /* E455 a recorded clip on the card is replaced by its voice alone once separated (same media file name, so the
       card keeps pointing at it); the card is not held up while the model runs */
    if(extra.recorded&&config.ankiVoiceIsolate!==false&&extra.sentenceAudio?.data){const data=extra.sentenceAudio.data,name='tomoyo_g_'+require('node:crypto').createHash('sha256').update(data).digest('hex').slice(0,16)+(extra.sentenceAudio.ext||'.wav');
-    require('./vocal-sep.cjs').isolate(this.root,data).then(async clean=>{if(!clean)return;let out=clean.toString('base64');/* (user 2026-11-12) no voice left once the music is gone: the line is unvoiced, so the card speaks it */if(require('../core/voice-trim.cjs').quiet(clean)){try{await this.runtime.services().ensureSpeech(config.aivisUrl,config.aivisGpu);const s=await this.runtime.speech().synthesize({surface:args.text,reading:'',pitch:[]},config);if(s?.data){out=s.data;/* plays on the synthesized-sentence channel */const mc=require('../core/anki-media-cache.cjs');mc.markSynth(mc.dirFor(this.root),name);}}catch{}}return new(require('../core/anki.cjs').Anki)(fetch,{mediaDir:require('../core/anki-media-cache.cjs').dirFor(this.root)}).call(config,'storeMediaFile',{filename:name,data:out});}).then(done=>{if(done!==undefined)try{logSink.append(path.join(this.root,'logs','reader-host.log'),JSON.stringify({at:new Date().toISOString(),type:'ankiVoiceIsolated',file:name})+'\n');}catch{}}).catch(()=>{});
+    require('./vocal-sep.cjs').isolate(this.root,data).then(async clean=>{if(!clean)return;let out=clean.toString('base64');/* (user 2026-11-12) no voice left once the music is gone: the line is unvoiced, so the card speaks it */if(require('../core/voice-trim.cjs').quiet(clean)){try{await this.runtime.services().ensureSpeech(config.aivisUrl,config.aivisGpu);const s=await this.runtime.speech().synthesize({surface:args.text,reading:'',pitch:[]},config);if(s?.data){out=s.data;/* plays on the synthesized-sentence channel */const mc=require('../core/anki-media-cache.cjs');mc.markSynth(mc.dirFor(this.root),name);}}catch{}}return new(require('../core/anki.cjs').Anki)(fetch,{mediaDir:require('../core/anki-media-cache.cjs').dirFor(this.root)}).call(config,'storeMediaFile',{filename:name,data:out});}).then(done=>{tm?.later('vocalSeparationAndStore',{stored:done!==undefined});if(done!==undefined)try{logSink.append(path.join(this.root,'logs','reader-host.log'),JSON.stringify({at:new Date().toISOString(),type:'ankiVoiceIsolated',file:name})+'\n');}catch{}}).catch(error=>{tm?.later('vocalSeparationAndStore',{error:String(error?.message||error)});});
     result.voiceIsolation=require('./vocal-sep.cjs').ready(this.root)?'pending':'preparing';}
+   tm?.done({noteId:result.id});
    return result;
   }
   throw Error('UNKNOWN_LEARNING_ACTION');

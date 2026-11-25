@@ -79,8 +79,11 @@
    return Number.isFinite(top)?{top,bottom,jp:Number.isFinite(jt)?{top:jt,bottom:jb}:null}:null;}
   // The pending translation reserves space using earlier lines. It is not the height of this translation.
   // Measure the actual output at its live width, with the Japanese already pinned in normal flow.
-  function fitTranslation(cn,limit){
-   let next=1,cap=0;
+  /* fork (wakare): clientTop given, a translation still too tall at 60 % lifts the whole line (never above the client top)
+     before anything scrolls; upstream left it below the screen when less than one row was left. Measured with the
+     current lift taken out (s0), so the decision does not flip once the line has moved. */
+  function fitTranslation(cn,limit,clientTop){
+   let next=1,cap=0,up=0;const s0=shift,lift=Number.isFinite(clientTop);
    if(cn?.dataset.state==='ready'&&!cn.hidden&&cn.textContent.trim()&&cn.getClientRects().length){
     if(fit===1&&shift===0&&room===0&&cn.getBoundingClientRect().bottom<=limit)return;
     const base=parseFloat(w.getComputedStyle(cn).getPropertyValue('--tomoyo-gal-cn-size'));
@@ -91,14 +94,15 @@
      inline.setProperty('min-height','0','important');inline.setProperty('max-height','none','important');
      const measureAt=scale=>{
       inline.setProperty('font-size',base*scale+'px','important');
-      return cn.getBoundingClientRect();
+      const r=cn.getBoundingClientRect();return {top:r.top-s0,bottom:r.bottom-s0};
      };
      if(measureAt(1).bottom>limit){
       const smallest=measureAt(MIN);
       if(smallest.bottom>limit){
        next=MIN;
-       const available=Math.floor(limit-smallest.top);
-       if(available>=(parseFloat(w.getComputedStyle(cn).lineHeight)||base*MIN))cap=available;
+       if(lift){const top=(cn.closest('.sentence-window')||cn).getBoundingClientRect().top-s0;up=Math.max(0,Math.min(Math.ceil(smallest.bottom-limit),Math.floor(top-clientTop-MARGIN)));}
+       const available=Math.floor(limit-(smallest.top-up));
+       if(smallest.bottom-up>limit&&available>=(parseFloat(w.getComputedStyle(cn).lineHeight)||base*MIN))cap=available;
       }else{
        // Line breaks are discrete. A ratio of box heights can skip a larger size that still fits.
        let low=Math.round(MIN*1000),high=1000;
@@ -111,7 +115,7 @@
      }
     }finally{for(const [k,v,p] of saved){if(v)inline.setProperty(k,v,p);else inline.removeProperty(k);}}
    }
-   if(next!==fit||shift!==0||cap!==room){fit=next;shift=0;room=cap;set();}
+   if(next!==fit||shift!==-up||cap!==room){fit=next;shift=-up;room=cap;set();}
   }
   function check(){frame=0;
    if(!d.body?.classList.contains('tomoyo-gal-bound')){reset();return;}
@@ -124,7 +128,7 @@
    if(geometry!==clientGeometry){clientGeometry=geometry;reset();}
    if(notice){fitNotice(win,client);return;}
    if(win.classList.contains('tomoyo-hook-reader')&&win.querySelector('.sentence-text')){
-    fitTranslation(win.querySelector('.tomoyo-cn-output'),Math.min(client.bottom,w.innerHeight)-MARGIN);return;
+    fitTranslation(win.querySelector('.tomoyo-cn-output'),Math.min(client.bottom,w.innerHeight)-MARGIN,Math.max(0,client.top));return;
    }
    /* measured with the current shift taken out, so moving up is decided again from the real place */
    const m=measure(win);if(!m)return;const box={top:m.top-shift,bottom:m.bottom-shift};
