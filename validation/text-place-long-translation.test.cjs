@@ -30,6 +30,11 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>
     /* the next short sentence goes back to the game's place */
     await at(880, '谢谢。'); await frame();
     const c = await rects(); assert.ok(Math.abs(c.jpTop - 880) <= 12, 'back on its place ' + JSON.stringify(c));
+    /* an overlay wider than the game (two monitors): the box starting at the game's first character keeps its right edge inside the client */
+    await page.evaluate(() => { window.__tomoyoChinese.galLayoutInfo = () => ({ clientX: 0, clientY: 0, clientWidth: 1200, clientHeight: 1080, workBottom: 1080 }); });
+    await at(880, '人类的栖息地。'); await frame();
+    const d = await page.evaluate(() => { const r = document.querySelector('.sentence-window').getBoundingClientRect(), t = [...document.querySelectorAll('.sentence-text .char-token')].map(n => n.getBoundingClientRect().right); return { right: Math.round(r.right), text: Math.round(Math.max(...t)) }; });
+    assert.ok(d.right <= 1192 + 1 && d.text <= 1192 + 1, 'inside the game client ' + JSON.stringify(d));
     assert.deepStrictEqual(errors, []);
     console.log('ok text-place long translation');
   } finally { await browser.close(); }

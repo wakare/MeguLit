@@ -122,7 +122,7 @@
   function pin(win, sentence) {
     if (!anchor || !win || !sentence) return;
     document.body.classList.add('megulit-anchored'); win.classList.add('megulit-anchor-window');
-    for (const p of ['left', 'top']) win.style.removeProperty(p);
+    for (const p of ['left', 'top', 'max-width']) win.style.removeProperty(p); /* fork: max-width is set again below */
     /* 2026-11-21 (owner's recording: the translation jumped back and forth while a slider moved): the rows a previous frame closed
        up are opened before anything is measured, so every frame places the line from the same layout and decides once */
     const row = win.querySelector('.tomoyo-cn-row');
@@ -138,6 +138,9 @@
     appliedOffset = {x:offX / cwc * 100, y:offY / chc * 100};
     if (tr && tr.width && anchor.center) { set(win, 'left', (anchor[0] + offX - wr.width / 2) + 'px'); set(win, 'top', (wr.top + anchor[1] + offY - tr.top) + 'px'); set(win, 'right', 'auto'); set(win, 'bottom', 'auto'); set(win, 'margin', '0'); }
     else if (tr && tr.width) { set(win, 'left', (wr.left + anchor[0] + offX - tr.left) + 'px'); set(win, 'top', (wr.top + anchor[1] + offY - tr.top) + 'px'); set(win, 'right', 'auto'); set(win, 'bottom', 'auto'); set(win, 'margin', '0'); }
+    /* fork (wakare): the box keeps the reader's width (a share of the game client) but starts at the game's first character, so on a
+       wide overlay (two monitors) its rows ran past the game's right edge onto the next monitor; its right edge now stays in the client */
+    if (tr && tr.width && !anchor.center) { const left = win.getBoundingClientRect().left, room = Math.floor(cx0 + cwc - 8 - left); if (room >= 200 && wr.width > room) set(win, 'max-width', room + 'px'); }
     /* 2026-11-19 (user, windowed 千恋＊万花: 「不要再挤压我的汉字了 我窗口化呢 只要显示器上还有位置就不要这样」): the translation keeps the
        user's size and goes on below the game window as long as the monitor's work area has room (the overlay spans the desktop);
        only a sentence that does not fit above the work-area bottom is made smaller, never below 85 %, and if it still
