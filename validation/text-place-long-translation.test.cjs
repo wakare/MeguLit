@@ -35,6 +35,11 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>
     await at(880, '人类的栖息地。'); await frame();
     const d = await page.evaluate(() => { const r = document.querySelector('.sentence-window').getBoundingClientRect(), t = [...document.querySelectorAll('.sentence-text .char-token')].map(n => n.getBoundingClientRect().right); return { right: Math.round(r.right), text: Math.round(Math.max(...t)) }; });
     assert.ok(d.right <= 1192 + 1 && d.text <= 1192 + 1, 'inside the game client ' + JSON.stringify(d));
+    /* a line on the game's own rows (nowrap) whose row is wider than the game's: it wraps at the box edge instead of leaving the client */
+    await page.evaluate(() => { const text = '今し方まで、確かに激痛を発していた右足だったが、もうかれこれ８年ほど前からない。'; const s = document.querySelector('.sentence-text'); s.innerHTML = [...text].map(c => `<span class="char-token">${c}</span>`).join(''); s.style.fontSize = '44px'; document.querySelector('.tomoyo-cn-row').textContent = '右腿刚才还传来剧烈疼痛。';
+      const rects = [...text].map((c, i) => i < 34 ? [200 + i * 28, 700, 28, 28] : [200 + (i - 34) * 28, 742, 28, 28]); window.__tomoyoChinese.textPlace({ text, client: [1920, 1080], rects }); }); await frame();
+    const e = await page.evaluate(() => ({ right: Math.round(Math.max(...[...document.querySelectorAll('.sentence-text .char-token')].map(n => n.getBoundingClientRect().right))), rows: document.querySelector('.sentence-window').classList.contains('megulit-game-rows') }));
+    assert.ok(e.right <= 1196 + 1, 'game-row line stays inside the client ' + JSON.stringify(e));
     assert.deepStrictEqual(errors, []);
     console.log('ok text-place long translation');
   } finally { await browser.close(); }
