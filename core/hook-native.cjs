@@ -699,6 +699,10 @@ class HookNative{
   }
   /* 2026-11-19 (素晴らしき日々: 「やっぱり……いい女には、」「たばこと」「屋上と」… one sentence the game adds to its box piece by piece) a piece of an open quotation grows the line (core/sentence-pieces.cjs) */if(!this.filterHookRedraws()&&typeof drawn==='string'&&drawn.trim()){const grown=(this.sentencePieces||(this.sentencePieces=new SentencePieces(()=>this.now()))).take(this.sourceStream||'',drawn,this.speaker&&this.now()-this.speaker.at<2500?this.speaker.text:'',this.speaker?.at??Infinity);if(grown!==drawn){this.trace('sentence piece joined chars='+drawn.length+'->'+grown.length);drawn=grown;}}
   let text=String(this.originalTextFor(String(drawn??'').replace(/\n+$/,''))??'').replace(/\n+$/,'');
+  /* fork (wakare): ATRI (official Chinese build) delivered 「起きた？\nうなされてたわよ？」"醒了？ - the Japanese line with the start of
+     the Chinese line after it, shown in the reader and sent to translation. A tail after the closing quote that opens with a
+     quote mark and holds no kana is not part of the Japanese line. */
+  {const cut=text.replace(/([」』])\s*["“”][^ぁ-ゖァ-ヺ」』]*$/,'$1');if(cut!==text&&/[ぁ-ゖァ-ヺ]/.test(cut)){this.trace('foreign tail after the closing quote dropped '+JSON.stringify(text.slice(cut.length,cut.length+20)));text=cut;}}
   if(!text.trim())return;
   /* 2026-11-13 multi-language container (サノバウィッチ 日简繁): the game's own Chinese track is this line's official translation */{const zh=require('./language-tracks.cjs').chineseTrack(scriptSource(cleanSource(m.text,name,String(m.sourceCode||''))),text);if(zh){const k=text.replace(/\s+/g,'');(this.trackPairs||(this.trackPairs=new Map())).set(k,zh);if(this.trackPairs.size>4000)this.trackPairs.delete(this.trackPairs.keys().next().value);}}
   /* E320 WITCH ON THE HOLY NIGHT (flow page): its title-screen help ("Change text display speed.Change auto-scroll speed." ...) came through the dialogue hook
