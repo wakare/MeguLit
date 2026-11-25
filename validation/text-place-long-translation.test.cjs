@@ -40,6 +40,9 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>
       const rects = [...text].map((c, i) => i < 34 ? [200 + i * 28, 700, 28, 28] : [200 + (i - 34) * 28, 742, 28, 28]); window.__tomoyoChinese.textPlace({ text, client: [1920, 1080], rects }); }); await frame();
     const e = await page.evaluate(() => ({ right: Math.round(Math.max(...[...document.querySelectorAll('.sentence-text .char-token')].map(n => n.getBoundingClientRect().right))), rows: document.querySelector('.sentence-window').classList.contains('megulit-game-rows') }));
     assert.ok(e.right <= 1196 + 1, 'game-row line stays inside the client ' + JSON.stringify(e));
+    /* and it flows in full rows: no short row left where the game broke its narrower row */
+    const rowsOf = await page.evaluate(() => { const tops = [...document.querySelectorAll('.sentence-text .char-token')].map(n => Math.round(n.getBoundingClientRect().top)); const rows = []; for (const t of tops) { const r = rows.find(x => Math.abs(x.t - t) < 10); if (r) r.n++; else rows.push({ t, n: 1 }); } return rows.map(r => r.n); });
+    assert.ok(rowsOf.slice(0, -1).every(n => n >= rowsOf[0] - 2), 'full rows except the last ' + JSON.stringify(rowsOf));
     assert.deepStrictEqual(errors, []);
     console.log('ok text-place long translation');
   } finally { await browser.close(); }

@@ -142,9 +142,11 @@
        wide overlay (two monitors) its rows ran past the game's right edge onto the next monitor; its right edge now stays in the client */
     if (tr && tr.width && !anchor.center) { const left = win.getBoundingClientRect().left, room = Math.floor(cx0 + cwc - 8 - left); if (room >= 200 && wr.width > room) set(win, 'max-width', room + 'px'); }
     /* fork: the game's own row breaks are kept unwrapped (megulit-game-rows), but a row drawn wider than the game's (our font is
-       larger) then ran past the client edge; such a line also wraps at the box edge */
-    sentence.style.removeProperty('white-space');
-    if (win.classList.contains('megulit-game-rows')) { const edge = cx0 + cwc - 4, rights = [...sentence.querySelectorAll('.char-token')].map(t => t.getBoundingClientRect().right); if (rights.length && Math.max(...rights) > edge) set(sentence, 'white-space', 'normal'); }
+       larger) then ran past the client edge; such a line drops the game's breaks and flows in full rows at the box edge (keeping the
+       breaks as well left short ragged rows: 「るが、劇的」「簡単には手に」) */
+    sentence.style.removeProperty('white-space'); for (const br of sentence.querySelectorAll('br.megulit-row-br')) br.style.removeProperty('display');
+    if (win.classList.contains('megulit-game-rows')) { const edge = cx0 + cwc - 4, rights = [...sentence.querySelectorAll('.char-token')].map(t => t.getBoundingClientRect().right);
+      if (rights.length && Math.max(...rights) > edge) { set(sentence, 'white-space', 'normal'); for (const br of sentence.querySelectorAll('br.megulit-row-br')) set(br, 'display', 'none'); } }
     /* 2026-11-19 (user, windowed 千恋＊万花: 「不要再挤压我的汉字了 我窗口化呢 只要显示器上还有位置就不要这样」): the translation keeps the
        user's size and goes on below the game window as long as the monitor's work area has room (the overlay spans the desktop);
        only a sentence that does not fit above the work-area bottom is made smaller, never below 85 %, and if it still
