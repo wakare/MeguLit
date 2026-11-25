@@ -30,8 +30,17 @@ pwsh -File tools\fork-deploy.ps1 -Install E:\MeguLit -DryRun   # check it applie
 pwsh -File tools\fork-deploy.ps1 -Install E:\MeguLit           # apply, then restart MeguLit
 ```
 
-Originals are kept in `E:\MeguLit\cache\fork-backup\<version>`. A MeguLit update replaces the files, so run it again
-after updating. To undo: copy the backup over the install and delete `data\hot-update.json`.
+Originals are kept in `E:\MeguLit\cache\fork-backup\<version>`. To undo: copy the backup over the install and delete
+`data\hot-update.json`.
+
+## Taking a MeguLit update
+
+The deploy script also writes `data\fork-hold-updates.json` (`{"hold":true}`), which makes MeguLit skip its update check
+(silent hot updates included), so an update never replaces the fork's files unannounced. To update when we choose:
+
+1. Merge upstream into the fork (`git fetch https://github.com/ilynthn/MeguLit main` and merge), fix conflicts, rerun tests.
+2. Delete `E:\MeguLit\data\fork-hold-updates.json`, restart MeguLit and take the update from its card.
+3. Run `tools\fork-deploy.ps1` again (it puts the fork's changes on the new version and holds updates again), restart.
 
 ## Full build (not set up on this PC yet)
 

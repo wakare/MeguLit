@@ -115,6 +115,9 @@ function refreshIcons(root,current,run=(file,args)=>{const c=require('node:child
  if(seen===String(current))return false;try{run(path.join(process.env.SystemRoot||'C:\\Windows','System32','ie4uinit.exe'),['-show']);fs.mkdirSync(path.dirname(mark),{recursive:true});fs.writeFileSync(mark,JSON.stringify({version:String(current)}));return true;}catch{return false;}
 }
 async function check(current,fetcher=fetch,root=''){current=String(current||'').trim().replace(/^v/,'');tidyRollback(root);refreshIcons(root,current);try{require('./uninstall.cjs').registerSoon(root,current);}catch{}
+ /* fork (wakare): data/fork-hold-updates.json {"hold":true} (written by tools/fork-deploy.ps1) holds every update, silent hot
+    updates included, so the fork's files are not replaced behind our back; updates are taken by hand (FORK.md) */
+ if(root)try{if(JSON.parse(fs.readFileSync(path.join(root,'data','fork-hold-updates.json'),'utf8')).hold===true){updateLog(root,'update check skipped: held by fork-hold-updates.json');found=null;return {current,latest:current,newer:false,required:false,hotfix:false,hot:false,silent:false,held:true,phase:state.phase};}}catch{}
  const [releaseResult,p]=await Promise.all([latest(fetcher).then(value=>({value}),error=>({error})),policy(fetcher,root)]);
  const required=!!(p?.minVersion&&newer(p.minVersion,current));
  if(releaseResult.error){if(required)return {current,latest:p.latest,newer:true,required:true,policy:p,hot:false,silent:false,notes:'',page:'https://github.com/ilynthn/MeguLit/releases/latest'};throw releaseResult.error;}
