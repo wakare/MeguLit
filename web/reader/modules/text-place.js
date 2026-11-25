@@ -1091,4 +1091,13 @@
   addEventListener('resize', schedule);
   new MutationObserver(() => { if (on && (anchor || page || bandWindow)) schedule(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
   addEventListener('megulit-profile', schedule);
+  /* fork (wakare): the hide check found the game's own text still on screen for this line (ATRI: after a clear the game draws the
+     line again through a path the hook does not blank, about 1 line in 20); a plate behind the line covers it until the next line */
+  { const css = document.createElement('style'); css.id = 'megulit-fork-cover-style';
+    css.textContent = 'body.megulit-fork-cover .sentence-window .sentence-text{background:rgba(14,16,22,.86)!important;box-shadow:0 0 0 18px rgba(14,16,22,.86)!important;border-radius:4px}';
+    (document.head || document.documentElement).append(css); }
+  (function cover() { if (b.forkCoverBound) return; if (typeof b.galStatus !== 'function') { setTimeout(cover, 500); return; } b.forkCoverBound = true; const previous = b.galStatus;
+    b.galStatus = m => { previous(m); if (!m || typeof m !== 'object') return;
+      if (typeof m.hookSource === 'string' || m.hookSource === null || m.type === 'gameClosed') document.body.classList.remove('megulit-fork-cover');
+      if (m.hookCheckState === 'visible') document.body.classList.add('megulit-fork-cover'); }; })();
 })();

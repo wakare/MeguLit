@@ -43,6 +43,12 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>
     /* and it flows in full rows: no short row left where the game broke its narrower row */
     const rowsOf = await page.evaluate(() => { const tops = [...document.querySelectorAll('.sentence-text .char-token')].map(n => Math.round(n.getBoundingClientRect().top)); const rows = []; for (const t of tops) { const r = rows.find(x => Math.abs(x.t - t) < 10); if (r) r.n++; else rows.push({ t, n: 1 }); } return rows.map(r => r.n); });
     assert.ok(rowsOf.slice(0, -1).every(n => n >= rowsOf[0] - 2), 'full rows except the last ' + JSON.stringify(rowsOf));
+    /* the hide check reports the game's own text still visible: a plate covers the line until the next line arrives */
+    await page.evaluate(() => { window.__tomoyoChinese.galStatus = () => {}; }); await page.waitForTimeout(700);
+    await page.evaluate(() => window.__tomoyoChinese.galStatus({ hookCheckState: 'visible' }));
+    assert.ok(await page.evaluate(() => document.body.classList.contains('megulit-fork-cover') && getComputedStyle(document.querySelector('.sentence-text')).backgroundColor !== 'rgba(0, 0, 0, 0)'), 'covered while the game text shows');
+    await page.evaluate(() => window.__tomoyoChinese.galStatus({ hookSource: '次の行' }));
+    assert.equal(await page.evaluate(() => document.body.classList.contains('megulit-fork-cover')), false, 'the next line drops the cover');
     assert.deepStrictEqual(errors, []);
     console.log('ok text-place long translation');
   } finally { await browser.close(); }
