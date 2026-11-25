@@ -42,6 +42,22 @@ The deploy script also writes `data\fork-hold-updates.json` (`{"hold":true}`), w
 2. Delete `E:\MeguLit\data\fork-hold-updates.json`, restart MeguLit and take the update from its card.
 3. Run `tools\fork-deploy.ps1` again (it puts the fork's changes on the new version and holds updates again), restart.
 
+## Native KiriKiri hook (MeguLitKrkr32/64.dll)
+
+The fork changes `native/krkrtext/script.inc` (TJS embedded in the DLL): a TextRender game (ATRI) that hides its message
+window for a moment and shows the same line again kept its text hidden only until the window hid; now the text layer stays
+hidden and the line is reported again when the window returns. Build and install (the game must be restarted to load it):
+
+```powershell
+$env:MEGULIT_VS = 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat'
+$env:MEGULIT_VS_X86 = "$PWD\native\vsx86.cmd"
+cmd /c native\krkrtext\build.cmd; cmd /c native\krkrtext\selftest\run.cmd
+```
+
+Then copy `native\MeguLitKrkr32.dll` and `MeguLitKrkr64.dll` into `E:\MeguLit\native` (rename the loaded ones first if the
+game is running). Each literal piece in script.inc must stay under 8,190 wide characters (split with `)MGLT", LR"MGLT(`).
+Logs: `trclear why=...` and the `held=` count in hook-diagnostics.log.
+
 ## Full build (not set up on this PC yet)
 
 `Build.ps1` / `Release.ps1` need, besides Node: Rust + cargo (the Tauri shell in `desktop/`), the MSVC C++ toolset

@@ -344,11 +344,23 @@ LR"MGLT((function(){
    /* A TextRender buffer can hold both dialogue and clickable link text. Keep that buffer visible while
       the engine owns links; opacity zero would erase choices together with the dialogue. */
    st.trUi=function(L){try {return typeof L.numLinks!='undefined' && +L.numLinks>0;} catch(e) {return false;}} incontextof st;
+)MGLT", LR"MGLT(
    st.trHide=function(){
     try {
      if(typeof this.trRolesOff=='Object') this.trRolesOff();
      var L=this.trLayer();
-     if(this.trRec!==void && (L===void || this.trOwner!==L || !this.shown(L))) {this.trClear(this.trOwner);return;}
+     /* fork (wakare, live ATRI): the game hides its message window for a moment (a transition, a load) and shows it again with the
+        same line still in the text layer, without a new render. Letting the line go there gave the text layer its opacity back and
+        the game's text stayed on screen under the reader's (1 line in 20). While the line's own layer is only hidden, the reader is
+        told the line is gone (as before) but the text layer stays at opacity 0; when the window comes back with no new render the
+        line is reported again. A new render or MeguLit going away still ends the hide. */
+     if(this.trRec!==void && L!==void && this.trOwner===L && !this.shown(L) && this.hideOn()) {
+      if(!this.trAway) {this.trAway=true;this.trHeld=(+this.trHeld)+1;var ra=this.trRec,sa=this.screen();this.report('ToMe_CHARS engine=krkr line='+ra[1]+' hidden=0 sw='+int(sa[0])+' sh='+int(sa[1])+' vx=0 vy=0 vw=0 vh=0 n=0 rects= text=');}
+      return;}
+     if(this.trAway && this.trRec!==void && L===this.trOwner && this.shown(L)) {this.trAway=false;var rb=this.trRec;this.trKey='';this.report('ToMe_CHARS engine=krkr line='+rb[1]+' hidden='+rb[0]+rb[2]);}
+     if(this.trRec!==void && (L===void || this.trOwner!==L || !this.shown(L))) {
+      try {var o=this.trOwner;this.report('ToMe_KRKR status trclear why='+(L===void?'nolayer':(o!==L?'owner':'notshown'))+' held='+(+this.trHeld));} catch(e) {}
+      this.trClear(this.trOwner);return;}
      if(L===void || this.trOwner!==L || this.trRec===void) {this.trRestore();return;}
      if(this.trUi(L)) {this.trClear(L);return;}
      var T=L.textLayer,on=this.hideOn() && !(typeof this.cfg=='Object' && this.cfg.embed);
@@ -363,6 +375,7 @@ LR"MGLT((function(){
      if(this.trRec!==void && h!=this.trRec[0]) {this.trRec[0]=h;var r=this.trRec;this.trKey='';this.report('ToMe_CHARS engine=krkr line='+r[1]+' hidden='+h+r[2]);}
     } catch(e) {}
    } incontextof st;
+)MGLT", LR"MGLT(
    st.trNote=function(k){
     try {if(typeof this.trWhy!='Object' || this.trWhy===void) this.trWhy=%[];var n=(+this.trWhy[k])+1;this.trWhy[k]=n;
      if(n==1 || n==2 || n==4 || n==8 || n==16 || n==64 || n==256) this.report('ToMe_KRKR status trwhy '+k+'='+n+' sent='+(+this.charsSent));} catch(e) {}
@@ -371,7 +384,7 @@ LR"MGLT((function(){
    st.trClear=function(L){
     try {L.__mgTrAll=void;} catch(e) {}
     if(this.trOwner!==L) return;
-    var line=this.trRec!==void?this.trRec[1]:0,scr=this.screen();this.trRestore();
+    var line=this.trRec!==void?this.trRec[1]:0,scr=this.screen();this.trRestore();this.trAway=false;
     if(typeof this.embTrOff=='Object') this.embTrOff();this.embPend=void;
     this.trRec=void;this.trText='';this.trKey='';this.trPts=void;this.trCol=void;this.trAll=void;this.trAllL=void;
     if(line>0) this.report('ToMe_CHARS engine=krkr line='+line+' hidden=0 sw='+int(scr[0])+' sh='+int(scr[1])+' vx=0 vy=0 vw=0 vh=0 n=0 rects= text=');
@@ -412,7 +425,7 @@ LR"MGLT((function(){
       var record='ToMe_CHARS engine=krkr line='+(100000+this.trLine)+' hidden='+h+tail;
       /* The native report function drops records at 28000 UTF-16 units. Never hide a snapshot it cannot forward. */
       if(record.length>=28000) {this.trClear(L);this.trNote('wire');return;}
-     this.trRec=[h,100000+this.trLine,tail];
+     this.trRec=[h,100000+this.trLine,tail];this.trAway=false;
       this.report(record);
      this.trAll=all;this.trAllL=L;
      /* Keep link characters with their actual message-layer owner, not whichever layer rendered last. */
