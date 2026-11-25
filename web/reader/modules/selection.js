@@ -48,6 +48,8 @@
  function place(){if(!card||stopDrag)return;const width=cardWidth();card.style.width=width+'px';card.classList.toggle('tome-card-compact',width<400);for(const x of card.querySelectorAll('.mg-ai-btn,.tomoyo-save-sentence-button'))if(!x.title)x.title=x.textContent.replace(/^\s*☆\s*/,'').trim();
   if(!card.__tomeMore){card.__tomeMore=true;card.addEventListener('scroll',more,{passive:true});new ResizeObserver(more).observe(card);let queued=0;new MutationObserver(()=>{if(!queued)queued=requestAnimationFrame(()=>{queued=0;more();});}).observe(card,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['open','hidden']});}
   const V=view();
+  /* fork (wakare): a card the user dragged opens again where it was left (kept inside the visible area) */
+  if(!card.__tomeMoved){const p=savedPlace();if(p){card.style.bottom='';card.style.removeProperty('max-height');card.style.left=p.left+'px';card.style.top=p.top+'px';card.__tomeMoved=true;}}
   if(card.__tomeMoved){keepInside(V,12);window.__tomoyoHitRegionsRefresh?.();return;}
   const rects=hitRects(),u=rects.length?{left:Math.min(...rects.map(r=>r.left)),right:Math.max(...rects.map(r=>r.right)),top:Math.min(...rects.map(r=>r.top)),bottom:Math.max(...rects.map(r=>r.bottom))}:{
    left:innerWidth/2,right:innerWidth/2,top:innerHeight/2,bottom:innerHeight/2};
@@ -65,6 +67,9 @@
    }
   else{card.style.bottom='';card.style.top=Math.round(u.bottom+gap)+'px';card.style.setProperty('max-height',Math.max(120,Math.round(Math.min(cap,below)))+'px','important');}
   keepInside(V,margin);more();window.__tomoyoHitRegionsRefresh?.();}
+ const PLACE_KEY='megulit.fork.lookupPlace';
+ function savedPlace(){try{const p=JSON.parse(localStorage.getItem(PLACE_KEY)||'null');return p&&Number.isFinite(p.left)&&Number.isFinite(p.top)?p:null;}catch{return null;}}
+ function savePlace(left,top){try{localStorage.setItem(PLACE_KEY,JSON.stringify({left:Math.round(left),top:Math.round(top)}));}catch{}}
  const GRIP_CONTROLS='button,a,input,select,textarea,summary,[role=button]';
  b.lookupGrip=()=>{const head=card?.querySelector('[data-lookup-grip]');return head&&{head,controls:head.querySelectorAll(GRIP_CONTROLS)};};
  function beginDrag(head,x,y,pointerId){
@@ -88,7 +93,7 @@
    };
    const finish=()=>{
     cancelAnimationFrame(frame);
-    if(moved){panel.style.left=left+'px';panel.style.top=top+'px';panel.__tomeMoved=true;}
+    if(moved){panel.style.left=left+'px';panel.style.top=top+'px';panel.__tomeMoved=true;savePlace(left,top);}
     panel.style.removeProperty('translate');
     controller.abort();stopDrag=null;lookupDrag=null;surface.remove();delete panel.dataset.lookupDrag;
     if(pointerId!==undefined&&panel.hasPointerCapture(pointerId))panel.releasePointerCapture(pointerId);
