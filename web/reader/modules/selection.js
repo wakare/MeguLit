@@ -50,7 +50,9 @@
   const V=view();
   /* fork (wakare): a card the user dragged opens again where it was left (kept inside the visible area) */
   if(!card.__tomeMoved){const p=savedPlace();if(p){card.style.bottom='';card.style.removeProperty('max-height');card.style.left=p.left+'px';card.style.top=p.top+'px';card.__tomeMoved=true;}}
-  if(card.__tomeMoved){keepInside(V,12);window.__tomoyoHitRegionsRefresh?.();return;}
+  /* fork: a dragged card is kept inside the reader window, like the drag itself: the screen numbers name only one monitor
+     of an overlay that spans two (the second one when the game sits there), which snapped the card onto that monitor's edge */
+  if(card.__tomeMoved){keepInside({left:0,top:0,right:innerWidth,bottom:innerHeight},12);window.__tomoyoHitRegionsRefresh?.();return;}
   const rects=hitRects(),u=rects.length?{left:Math.min(...rects.map(r=>r.left)),right:Math.max(...rects.map(r=>r.right)),top:Math.min(...rects.map(r=>r.top)),bottom:Math.max(...rects.map(r=>r.bottom))}:{
    left:innerWidth/2,right:innerWidth/2,top:innerHeight/2,bottom:innerHeight/2};
   {const line=sentenceRect();if(line&&line.top<=u.bottom&&line.bottom>=u.top){u.top=Math.min(u.top,line.top);u.bottom=Math.max(u.bottom,line.bottom);}}

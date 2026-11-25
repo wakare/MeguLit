@@ -42,6 +42,10 @@ test('lookup card: reopens where it was dragged, also after a reload, and stays 
   await load();
   const reloaded=await cdp.evaluate(OPEN);
   assert.deepEqual({left:reloaded.left,top:reloaded.top},dragged,'remembered after a reload');
+  /* the screen numbers name another monitor of a wide overlay (avail starts at 600): the card still opens at its place */
+  await cdp.evaluate(`(()=>{for(const [k,v] of Object.entries({availLeft:600,availTop:0,availWidth:600,availHeight:420}))Object.defineProperty(screen,k,{get:()=>v,configurable:true});return 1})()`);
+  const otherMonitor=await cdp.evaluate(OPEN);
+  assert.deepEqual({left:otherMonitor.left,top:otherMonitor.top},dragged,'not snapped to the other monitor');
   /* a remembered place off the current window is pulled back on screen */
   await cdp.evaluate(`localStorage.setItem('megulit.fork.lookupPlace',JSON.stringify({left:99999,top:99999}))`);
   const clamped=await cdp.evaluate(OPEN);
