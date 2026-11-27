@@ -35,6 +35,8 @@ foreach ($f in $files) {
 $exe = Get-Item -LiteralPath (Join-Path $Install 'MeguLit.exe')
 $stamp = '{0}-{1}' -f $exe.Length, [Math]::Floor(([DateTimeOffset]$exe.LastWriteTimeUtc).ToUnixTimeMilliseconds())
 @{ version = "$version-fork"; from = $version; exe = $stamp; files = $files.Count; at = [DateTime]::UtcNow.ToString('o') } | ConvertTo-Json -Compress | Set-Content -LiteralPath (Join-Path $Install 'data\hot-update.json') -Encoding utf8NoBOM
+# hand-found hook codes for engines MeguLit does not detect (native/HookBridge.cs InsertFixedCodes)
+Copy-Item -LiteralPath (Join-Path $repo 'tools\fork-hook-codes.json') (Join-Path $Install 'data\hook-codes.json') -Force
 # hold MeguLit's own updates (services/update.cjs): an update would replace the fork's files; take updates by hand (FORK.md)
 '{"hold":true}' | Set-Content -LiteralPath (Join-Path $Install 'data\fork-hold-updates.json') -Encoding utf8NoBOM
 Remove-Item -Recurse -Force $stage, $patch

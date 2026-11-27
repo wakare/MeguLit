@@ -42,6 +42,25 @@ The deploy script also writes `data\fork-hold-updates.json` (`{"hold":true}`), w
 2. Delete `E:\MeguLit\data\fork-hold-updates.json`, restart MeguLit and take the update from its card.
 3. Run `tools\fork-deploy.ps1` again (it puts the fork's changes on the new version and holds updates again), restart.
 
+## Games MeguLit does not detect: hand-found hook codes
+
+`native/HookBridge.cs` (InsertFixedCodes) inserts the codes in `data/hook-codes.json` right after injection
+(`{"<exe>|<exact size>": ["<LunaHook code>", ...]}`; the size part is optional). The list lives in
+`tools/fork-hook-codes.json` and `tools/fork-deploy.ps1` copies it. For such a game `core/hook-native.cjs` ignores the GPU
+page model (its window state failed there) and the reader draws the line in its own box; the GPU hide still blanks the game's text.
+
+- **Phantom PHANTOM OF INFERNO NITRO ARCHIVE** (幻灵镇魂曲, Steam 3639590, phantom.exe 3,886,152 bytes): a Squirrel engine
+  drawing its own glyphs, exe SteamStub-packed, main thread hidden from debuggers. The native behind the script function
+  `CountTextLength` (+0x9C320) gets each shown line as UTF-8 in rdx: `HV-24@9C320:phantom.exe`. Found with an in-process
+  hardware-breakpoint DLL (vectored handler; an outside debugger crashes this game). A game update changes the address:
+  the size in the key then skips the code and the bridge logs it.
+
+Build and install the bridge (MeguLit closed or its HookBridge renamed first):
+
+```powershell
+pwsh -File native\Build-HookBridge.ps1 -OutputPath <folder>\HookBridge.exe   # self-test runs at the end
+```
+
 ## Native KiriKiri hook (MeguLitKrkr32/64.dll)
 
 The fork changes `native/krkrtext/script.inc` (TJS embedded in the DLL): a TextRender game (ATRI) that hides its message
