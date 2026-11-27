@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Adapter to LunaHook's C ABI. See third_party/LunaHook/UPSTREAM.json.
 using System;
 using System.Collections.Generic;
@@ -194,7 +194,7 @@ static void FinishEmbed(long id,string trans,bool hide=false){PendingEmbed p;loc
  /* fork (wakare): hook codes found by hand for engines MeguLit does not detect (Phantom of Inferno Nitro Archive: a Squirrel
     engine with its own glyphs, nothing passes the text APIs). data/hook-codes.json: {"phantom.exe|3886152":["HV-24@9C320:phantom.exe"]}
     (key: exe file name, optionally |exact size); each code is inserted once after injection, then the normal stream selection runs. */
- static void InsertFixedCodes(){if(Reattach||_Luna_InsertHookCode==null)return;ThreadPool.QueueUserWorkItem(_=>{try{string f=Under("data","hook-codes.json");if(!File.Exists(f))return;var d=Json.Deserialize<Dictionary<string,object>>(File.ReadAllText(f));string exe=Path.GetFileName(HookTarget.ExePath??"");long size=0;try{size=new FileInfo(HookTarget.ExePath).Length;}catch{}
+ static void InsertFixedCodes(){if(_Luna_InsertHookCode==null)return;/* also on reattach: the previous bridge's hook list may not hold them (it may have gone before inserting) */ThreadPool.QueueUserWorkItem(_=>{try{string f=Under("data","hook-codes.json");if(!File.Exists(f))return;var d=Json.Deserialize<Dictionary<string,object>>(File.ReadAllText(f));string exe=Path.GetFileName(HookTarget.ExePath??"");long size=0;try{size=new FileInfo(HookTarget.ExePath).Length;}catch{}
    foreach(var kv in d){string[] key=kv.Key.Split('|');if(!String.Equals(key[0],exe,StringComparison.OrdinalIgnoreCase))continue;if(key.Length>1&&key[1]!=size.ToString()){Diagnostic("fixed hook codes for "+kv.Key+" skipped: this build is "+size);continue;}var codes=kv.Value as System.Collections.IEnumerable;if(codes==null)continue;Thread.Sleep(1500);
     foreach(var c in codes){string code=Convert.ToString(c);if(String.IsNullOrEmpty(code))continue;_Luna_InsertHookCode(Pid,code);Diagnostic("fixed hook code "+code+" (data/hook-codes.json)");}}}catch(Exception e){Diagnostic("fixed hook codes failed "+e.Message);}});}
  static void PreArmSignatureNow(){Dictionary<string,object> mem;lock(Gate){mem=CrossMemory;CrossMemory=null;}if(mem==null||KnownIsland||MagesAddress!=0)return;try{var sig=HookSignature.FromMemory(mem);ulong offset;ulong addr=HookSignature.Relocate(Pid,sig,out offset);if(addr==0){Diagnostic("signature not found in "+sig.Module+": automatic search");return;}
