@@ -54,6 +54,9 @@ function createTranslationService(fetcher = fetch, environmentKey = '') {
   const keyFor = base => keys.get(base) || (base === 'https://api.openai.com/v1' ? environmentKey : '') || '';
   const isLLM = provider => ['gpt','deepseek'].includes(provider) || ENGINES[provider]?.kind === 'llm';
   const keyless = provider => ENGINES[provider]?.keyless === true;
+  /* fork (wakare): an OpenAI-compatible service on this machine (127.0.0.1 / localhost, e.g. 朝凪 at :8787/megulit/v1) needs no key;
+     without one the request was refused before it was sent, so translation fell back to Microsoft and context explanations asked for a key */
+  const localBase = base => { try { return /^(127\.0\.0\.1|localhost|\[::1\])$/i.test(new URL(String(base)).hostname); } catch { return false; } };
   function setKey(base, key) {
     base = normalizeBase(base);
     if (typeof key !== 'string' || key.length > 10000 || /[\r\n]/.test(key)) throw new Error('API 密钥格式无效');
@@ -83,7 +86,7 @@ function createTranslationService(fetcher = fetch, environmentKey = '') {
     const engine = ENGINES[options.provider];
     const model = (options.model || (engine ? engine.model : 'gpt-4.1-mini') || '').trim();
     if ((!model && isLLM(options.provider)) || model.length > 200 || /[\r\n]/.test(model)) throw new Error('请填写有效的模型名');
-    const apiKey = keyFor(base) || (keyless(options.provider) ? 'none' : '');
+    const apiKey = keyFor(base) || (keyless(options.provider) || localBase(base) ? 'none' : '');
     if (!apiKey) throw new Error('请在翻译设置中填写 API Key 并保存');
     const fingerprint = createHash('sha256').update(apiKey).digest('hex');
     const extra=isLLM(options.provider)&&typeof options.translationPrompt==='string'?options.translationPrompt.trim().slice(0,2000):'';
@@ -160,7 +163,7 @@ function createTranslationService(fetcher = fetch, environmentKey = '') {
     const selection=String(input.selection||'').trim(),sentence=String(input.sentence||'');if(!selection||selection.length>1000||sentence.length>4000)throw Error('选区为空或过长');if(!isCurrent())throw Error('选区已变化');options=resolveOptions(options);const llm=isLLM(options.provider),engine=ENGINES[options.provider],mode=input.mode==='summary'?'summary':'explain';
     if(mode==='summary'&&!llm)throw Error('当前引擎只提供翻译，请在「学习与辞书」选择一个大模型进行归纳');
     if(options.provider==='google')return {text:await google(selection,isCurrent),kind:'translation',provider:'google'};
-    const base=normalizeBase(options.baseUrl),key=keyFor(base)||(keyless(options.provider)?'none':'');if(!key)throw Error('这个学习模型还没有 API Key，请在「学习与辞书」配置；本地查词仍可直接使用');
+    const base=normalizeBase(options.baseUrl),key=keyFor(base)||(keyless(options.provider)||localBase(base)?'none':'');if(!key)throw Error('这个学习模型还没有 API Key，请在「学习与辞书」配置；本地查词仍可直接使用');
     const dictionary=(input.entries||[]).slice(0,8).map(e=>({spellings:e.spellings?.slice(0,8),readings:e.readings?.slice(0,8),pos:e.pos,definitions:(e.definitions||[]).slice(0,40).map(s=>String(s).slice(0,800))}));while(dictionary.length>1&&JSON.stringify(dictionary).length>16000)dictionary.pop();const previous=history.filter(h=>h.source!==sentence).slice(-8).map(h=>({source:h.source,...(h.translation?{translation:h.translation}:{})}));while(previous.length&&JSON.stringify(previous).length>8000)previous.shift();
     const cacheKey=JSON.stringify([mode,selection,sentence,dictionary,previous,input.morphology,options.provider,base,options.model,options.learnerLanguage,createHash('sha256').update(key).digest('hex')]);if(lookupCache.has(cacheKey))return lookupCache.get(cacheKey);if(lookupPending.has(cacheKey))return lookupPending.get(cacheKey);
     const pending=(async()=>{if(!isCurrent())throw Error('选区已变化');let response,result;
